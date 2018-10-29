@@ -31,7 +31,7 @@ class Naughty(Fuzzer):
                 print(Style.RESET_ALL, end="")
                 fault = True
         if not fault:
-            print("[!] No faults detected using fast sweep")
+            print("[!] No faults detected using Naughty module")
 
     def run(self, target):
         self.format_string(target)

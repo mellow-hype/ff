@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# Author:   hyperlogic
+# Date:     11/2018
+# Project:  fuzzy-framework
+# A collection of fuzzing modules
+
 from utils import colors
 BORDER = "-"*40
 

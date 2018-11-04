@@ -10,8 +10,7 @@ class PayloadGen:
     @staticmethod
     def strings():
         payloads = []
-        for multi in primitives.String.MULTIPLIERS:
-            payloads.append("B"*multi)
+        payloads.append(primitives.String.BIG_STRING)
         
         for p in primitives.String.FORMAT_STRINGS:
             payloads.append(p)
@@ -20,15 +19,9 @@ class PayloadGen:
 
     @staticmethod
     def integer():
-        edge_range = 5
+        payloads = [str(x) for x in primitives.Integer.MAXINTS]
+        return payloads
 
-        edge_values = []
-        final_values = []
-        for i in range(1, edge_range):
-            edge_values.append([x-i for x in self.MAXINTS])
-        for edges in edge_values:
-            final_values.append([x for x in edges])
-        return final_values
 
     @staticmethod
     def random(size):

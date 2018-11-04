@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+# Author:   hyperlogic
+# Date:     11/2018
+# Project:  fuzzy-framework
+# A collection of fuzzing modules
 
 class Fuzzer:
     retcodes = {

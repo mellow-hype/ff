@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+# Author:   hyperlogic
+# Date:     11/2018
+# Project:  fuzzy-framework
+# A collection of fuzzing modules
 TYPES = ["string", "integer"]
 
 class Integer:
@@ -10,7 +15,7 @@ class Integer:
 
 class String:
     FORMAT_STRINGS = ["%n"*20, "%s"*20]
-    BIG_STRING = "B"*20000
+    BIG_STRING = "B"*10000
     MULTIPLIERS = [10, 20, 50]
     PATH_TRAVERSAL = ["../", "/..\/"]
 

@@ -8,7 +8,8 @@ import os
 
 from utils import colors
 from utils import message
-from modules.fuzz import Fuzzer
+from utils.overflow import overflow_locator
+from utils.fault_detector import FaultCatcher
 from generators.payload import PayloadGen
 from config import BORDER, TYPES
 from config import Config
@@ -19,7 +20,7 @@ PAYLOADS = {
     "integer": PayloadGen.integer
 }
 
-class EnvConnector(Fuzzer):
+class EnvConnector:
     '''
     Environment variable connector.
     '''
@@ -27,6 +28,7 @@ class EnvConnector(Fuzzer):
         self.vars = variables
         self.bin = binary
         self.payloads = {}
+        self.catcher = FaultCatcher()
         self.validate()
         self.generate_payloads()
         self.print_head()
@@ -46,44 +48,52 @@ class EnvConnector(Fuzzer):
             exit()
 
     
-    def execute(self, target_var, payload_list):
-        for payload in payload_list:
-            env = os.environ.copy()
-            env[target_var] = payload
-            fault_detected = False
+    def execute(self, target_var, payload):
+        self.current_payload = payload
+        env = os.environ.copy()
+        env[target_var] = payload
 
-            try:
-                proc = subprocess.Popen(
-                    [self.bin],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.PIPE,
-                    env=env,
-                    shell=True
-                )
-                err = proc.communicate()
-                err_message = err[1].decode()
-                proc.wait()
-                
-                if self.check_fault(proc.returncode):
-                    fault = True
-                    if len(payload) > 100:
-                        payload = "'{}...' (truncated, {} bytes). Potential buffer overflow.".format(payload[:3], len(payload))
-                    elif "%n" or "%s" in payload:
-                        payload = "'{}...' (truncated). Potential format string bug.".format(payload[:5]) 
-                    message.alert("Fault detected using payload {}".format(payload))
-                    message.std_err(err_message)
-            except subprocess.CalledProcessError as exc:
-                print("Error: {}".format(exc.output))
-        if not fault_detected:
-            message.status("No faults detected.")
+        try:
+            proc = subprocess.Popen(
+                [self.bin],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                env=env,
+                shell=True
+            )
+            proc.wait()
+            return proc.returncode
+        except subprocess.CalledProcessError as exc:
+            print("Error: {}".format(exc.output))
 
     def generate_payloads(self):
         for target in self.vars:
             self.payloads[target.NAME] = PAYLOADS[target.TYPE]()
 
+    def launch(self, target, payload):
+        ret = self.execute(target, payload)
+        
+        if len(payload) > 100:
+            payload_msg = "'{}...' (truncated, {} bytes).".format(
+                payload[:3], 
+                len(payload)
+                )
+        
+        elif "%n" or "%s" in payload:
+            payload_msg = "'{}...' (truncated). Format string error.".format(
+                payload[:5]
+                ) 
+
+        if self.catcher.check_fault(ret):
+            message.alert("Fault detected using payload {}".format(payload_msg))
+            message.alert("Buffer overflow detected. Finding the faulting size now...")
+            overflow_locator(self.execute, target, 0, len(payload))
+
     def fuzz(self):
         for target in self.vars:
-            self.execute(target.NAME, self.payloads[target.NAME])
+            for payload in self.payloads[target.NAME]:
+                self.launch(target.NAME, payload)
+                    
             
     def print_head(self):
         target = colors.color_string("red", self.bin)

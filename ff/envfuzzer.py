@@ -3,18 +3,16 @@
 # Date:     11/2018
 # Project:  fuzzy-framework
 # A collection of fuzzing modules
-import argparse
 import subprocess
 import os
 
-from colorama import Fore, Style
-from modules.fuzz import Fuzzer
 from utils import colors
 from utils import message
-
-from config import BORDER, Config
+from modules.fuzz import Fuzzer
 from generators.payload import PayloadGen
-from utils import primitives
+from config import BORDER, TYPES
+from config import Config
+
 
 PAYLOADS = {
     "string": PayloadGen.strings,
@@ -29,15 +27,30 @@ class EnvConnector(Fuzzer):
         self.vars = variables
         self.bin = binary
         self.payloads = {}
-
+        self.validate()
         self.generate_payloads()
         self.print_head()
         self.fuzz()
+
+    def validate(self):
+        for var in self.vars:
+            if var.TYPE not in TYPES:
+                message.alert("{} is not a valid type. Valid types are '{}'".format(var.TYPE, TYPES))
+                exit()
+        
+        if not os.path.exists(self.bin):
+            message.alert("{} is not a valid path".format(self.bin))
+            exit()
+        elif not os.access(self.bin, os.X_OK):
+            message.alert("{} is not executable".format(self.bin))
+            exit()
+
     
     def execute(self, target_var, payload_list):
         for payload in payload_list:
             env = os.environ.copy()
             env[target_var] = payload
+            fault_detected = False
 
             try:
                 proc = subprocess.Popen(
@@ -52,6 +65,7 @@ class EnvConnector(Fuzzer):
                 proc.wait()
                 
                 if self.check_fault(proc.returncode):
+                    fault = True
                     if len(payload) > 100:
                         payload = "'{}...' (truncated, {} bytes). Potential buffer overflow.".format(payload[:3], len(payload))
                     elif "%n" or "%s" in payload:
@@ -60,7 +74,17 @@ class EnvConnector(Fuzzer):
                     message.std_err(err_message)
             except subprocess.CalledProcessError as exc:
                 print("Error: {}".format(exc.output))
+        if not fault_detected:
+            message.status("No faults detected.")
 
+    def generate_payloads(self):
+        for target in self.vars:
+            self.payloads[target.NAME] = PAYLOADS[target.TYPE]()
+
+    def fuzz(self):
+        for target in self.vars:
+            self.execute(target.NAME, self.payloads[target.NAME])
+            
     def print_head(self):
         target = colors.color_string("red", self.bin)
         target_var = ""
@@ -78,14 +102,6 @@ class EnvConnector(Fuzzer):
         print(BORDER)
         print()
 
-    def generate_payloads(self):
-        for target in self.vars:
-            self.payloads[target.NAME] = PAYLOADS[target.TYPE]()
-
-    def fuzz(self):
-        for target in self.vars:
-            self.execute(target.NAME, self.payloads[target.NAME])
-            
 
 if __name__ == "__main__":
     config = Config()

@@ -1,4 +1,5 @@
 BORDER = "-"*40
+TYPES = ["string", "integer"]
 
 class EnvironmentVariable:
     def __init__(self, name, var_type):

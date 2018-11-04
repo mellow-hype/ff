@@ -8,46 +8,66 @@ import subprocess
 import os
 
 from colorama import Fore, Style
-from modules.fuzz import Connector
+from modules.fuzz import Fuzzer
 from utils import colors
 from utils import message
 
-from config import MODS, BORDER
+from config import BORDER, Config
+from generators.payload import PayloadGen
+from utils import primitives
 
-class EnvConnector(Connector):
+PAYLOADS = {
+    "string": PayloadGen.strings,
+    "integer": PayloadGen.integer
+}
+
+class EnvConnector(Fuzzer):
     '''
     Environment variable connector.
     '''
-    def __init__(self):
-        self.var = ""
-        Connector.__init__(self, MODS)
-    
-    def execute(self, target, payload):
-        env = os.environ.copy()
-        env[self.var] = payload
+    def __init__(self, binary, variables):
+        self.vars = variables
+        self.bin = binary
+        self.payloads = {}
 
-        try:
-            proc = subprocess.Popen(
-                [target],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                env=env,
-                shell=True
-            )
-            proc.wait()
-            
-            return proc.returncode
-        except subprocess.CalledProcessError as exc:
-            print("Error: {}".format(exc.output))
+        self.generate_payloads()
+        self.print_head()
+        self.fuzz()
+    
+    def execute(self, target_var, payload_list):
+        for payload in payload_list:
+            env = os.environ.copy()
+            env[target_var] = payload
+
+            try:
+                proc = subprocess.Popen(
+                    [self.bin],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    env=env,
+                    shell=True
+                )
+                err = proc.communicate()
+                err_message = err[1].decode()
+                proc.wait()
+                
+                if self.check_fault(proc.returncode):
+                    if len(payload) > 100:
+                        payload = "'{}...' (truncated, {} bytes). Potential buffer overflow.".format(payload[:3], len(payload))
+                    elif "%n" or "%s" in payload:
+                        payload = "'{}...' (truncated). Potential format string bug.".format(payload[:5]) 
+                    message.alert("Fault detected using payload {}".format(payload))
+                    message.std_err(err_message)
+            except subprocess.CalledProcessError as exc:
+                print("Error: {}".format(exc.output))
 
     def print_head(self):
-        modules = [x for x in MODS.keys()]
-        modules = colors.color_string("red", ', '.join(modules))
-        target = colors.color_string("red", self.target)
-        target_var = colors.color_string("red", self.var)
-
+        target = colors.color_string("red", self.bin)
+        target_var = ""
+        for var in self.vars:
+            target_var += "{} ({}) ".format(var.NAME, var.TYPE)
+            
         head = {
-            "MODULES": modules,
             "TARGET FILE": target,
             "TARGET VARIABLE": target_var
         }
@@ -58,21 +78,15 @@ class EnvConnector(Connector):
         print(BORDER)
         print()
 
-    def handle_args(self):
-        parser = argparse.ArgumentParser(description="environment variable fuzzer")
-        parser.add_argument(
-            "var", 
-            metavar="VAR",
-            help="the target environment variable"
-        )
-        parser.add_argument(
-            "target", 
-            help="the target binary"
-        )
-        args = parser.parse_args()
-        self.target = args.target
-        self.var = args.var
+    def generate_payloads(self):
+        for target in self.vars:
+            self.payloads[target.NAME] = PAYLOADS[target.TYPE]()
 
+    def fuzz(self):
+        for target in self.vars:
+            self.execute(target.NAME, self.payloads[target.NAME])
+            
 
 if __name__ == "__main__":
-    EnvConnector()
+    config = Config()
+    EnvConnector(config.TARGET_BINARY, config.TARGET_VARIABLES)

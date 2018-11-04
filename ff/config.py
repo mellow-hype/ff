@@ -1,10 +1,10 @@
-from modules.naughty import Naughty
-from modules.overflow import OverflowFuzzer
-
-# MODULES
-MODS = {
-    "overflow": OverflowFuzzer, 
-    "naughty": Naughty
-    }
-
 BORDER = "-"*40
+
+class EnvironmentVariable:
+    def __init__(self, name, var_type):
+        self.NAME = name
+        self.TYPE = var_type
+
+class Config:
+    TARGET_BINARY="tests/bin/envsmash2"
+    TARGET_VARIABLES = [EnvironmentVariable("DUMMY", "string")]

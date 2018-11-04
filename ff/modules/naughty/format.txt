@@ -1,7 +1,0 @@
-%p%p%p%p%p%p%p%p%p%p
-%x%x%x%x%x%x%x%x%x%x
-%d%d%d%d%d%d%d%d%d%d
-%s%s%s%s%s%s%s%s%s%s
-%n%n%n%n%n%n%n%n%n%n
-%u%u%u%u%u%u%u%u%u%u
-%%%%%%%%%%%%%%%%%%%%
